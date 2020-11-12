@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "mytestaks-4e16"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "mytestaks-4e16"
+  template:
+    metadata:
+      labels:
+        app: "mytestaks-4e16"
+    spec:
+      containers:
+        - name: "mytestaks-4e16"
+          image: "smycr.azurecr.io/mytestaks"
+          ports:
+          - containerPort: 80
