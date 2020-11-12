@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: smycr.azurecr.io
+        username: ${{ secrets.acr_smycr_username }}
+        password: ${{ secrets.acr_smycr_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/amd64/hello-world" -f  "amd64/hello-world/Dockerfile" -t smycr.azurecr.io/mytestaks:${{ github.sha }}
+        docker push smycr.azurecr.io/mytestaks:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_mytestaks_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep mytestaksafc3 | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace mytestaksafc3`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: mytestaksafc3
+        container-registry-url: smycr.azurecr.io
+        container-registry-username: ${{ secrets.acr_smycr_username }}
+        container-registry-password: ${{ secrets.acr_smycr_password }}
+        secret-name: mytestaksdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: mytestaksafc3
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          smycr.azurecr.io/mytestaks:${{ github.sha }}
+        imagepullsecrets: |
+          mytestaksdockerauth
